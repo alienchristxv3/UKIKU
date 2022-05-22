@@ -2,8 +2,11 @@ package knf.kuma.commons
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.ComponentName
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.res.Resources
 import android.graphics.drawable.AnimationDrawable
 import android.net.Uri
@@ -254,10 +257,28 @@ fun <T : View> Activity.optionalBind(@IdRes res: Int): Lazy<T?> {
 fun Request.execute(followRedirects: Boolean = true): Response {
     return OkHttpClient().newBuilder().apply {
         followRedirects(followRedirects)
-        connectionSpecs(listOf(ConnectionSpec.CLEARTEXT, ConnectionSpec.Builder(ConnectionSpec.MODERN_TLS)
-                .allEnabledTlsVersions()
-                .allEnabledCipherSuites()
-                .build()))
+        connectionSpecs(
+            listOf(
+                ConnectionSpec.CLEARTEXT, ConnectionSpec.Builder(ConnectionSpec.MODERN_TLS)
+                    .allEnabledTlsVersions()
+                    .allEnabledCipherSuites()
+                    .build()
+            )
+        )
+    }.build().newCall(this).execute()
+}
+
+fun Request.executeNoSSl(followRedirects: Boolean = true): Response {
+    return NoSSLOkHttpClient.get().newBuilder().apply {
+        followRedirects(followRedirects)
+        connectionSpecs(
+            listOf(
+                ConnectionSpec.CLEARTEXT, ConnectionSpec.Builder(ConnectionSpec.COMPATIBLE_TLS)
+                    .allEnabledTlsVersions()
+                    .allEnabledCipherSuites()
+                    .build()
+            )
+        )
     }.build().newCall(this).execute()
 }
 
@@ -669,3 +690,37 @@ fun String.resolveRedirection(tryCount: Int = 0): String =
     }
 
 val isFullMode: Boolean get() = BuildConfig.DEBUG || BuildConfig.BUILD_TYPE == "release"
+
+private fun isIntentResolved(ctx: Context, intent: Intent): Boolean {
+    return ctx.packageManager.resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY) != null
+}
+
+fun isMIUI(ctx: Context): Boolean {
+    return isIntentResolved(
+        ctx,
+        Intent("miui.intent.action.OP_AUTO_START").addCategory(Intent.CATEGORY_DEFAULT)
+    )
+            || isIntentResolved(
+        ctx,
+        Intent().setComponent(
+            ComponentName(
+                "com.miui.securitycenter",
+                "com.miui.permcenter.autostart.AutoStartManagementActivity"
+            )
+        )
+    )
+            || isIntentResolved(
+        ctx, Intent("miui.intent.action.POWER_HIDE_MODE_APP_LIST").addCategory(
+            Intent.CATEGORY_DEFAULT
+        )
+    )
+            || isIntentResolved(
+        ctx,
+        Intent().setComponent(
+            ComponentName(
+                "com.miui.securitycenter",
+                "com.miui.powercenter.PowerSettings"
+            )
+        )
+    )
+}

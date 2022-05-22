@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <changelog>
+    <release code="196" version="5.1.27">
+        <change type="fix">Error al iniciar en TV</change>
+    </release>
+    <release code="195" version="5.1.26">
+        <change type="fix">Correccion para noticias</change>
+    </release>
+    <release code="194" version="5.1.25">
+        <change type="fix">Correccion para Android 12</change>
+    </release>
     <release code="193" version="5.1.24">
         <change type="fix">Imagenes de noticias</change>
     </release>

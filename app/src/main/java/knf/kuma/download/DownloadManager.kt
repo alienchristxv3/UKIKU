@@ -118,16 +118,26 @@ class DownloadManager : Service() {
                     doAsync { val downloadObject = downloadDao.getByDid(download.id)
                         if (downloadObject != null) {
                             if (FileAccessHelper.isTempFile(download.file)) {
+                                if (FileAccessHelper.getTmpFile(downloadObject.file).length() < 5) {
+                                    Log.e("Download", "Damaged tmp file, aborting")
+                                    errorNotification(downloadObject)
+                                    downloadDao.delete(downloadObject)
+                                    fetch?.delete(download.id)
+                                    stopIfNeeded()
+                                    return@doAsync
+                                }
                                 Log.e("Download", "Moving temp")
                                 downloadObject.setEta(-2)
                                 downloadObject.progress = 0
                                 downloadDao.update(downloadObject)
-                                FileUtil.moveFile(downloadObject.file, object : FileUtil.MoveCallback {
-                                    override fun onProgress(pair: android.util.Pair<Int, Boolean>) {
-                                        if (!pair.second) {
-                                            downloadObject.progress = pair.first
-                                            updateNotification(downloadObject, false)
-                                            downloadDao.update(downloadObject)
+                                FileUtil.moveFile(
+                                    downloadObject.file,
+                                    object : FileUtil.MoveCallback {
+                                        override fun onProgress(pair: android.util.Pair<Int, Boolean>) {
+                                            if (!pair.second) {
+                                                downloadObject.progress = pair.first
+                                                updateNotification(downloadObject, false)
+                                                downloadDao.update(downloadObject)
                                         } else if (pair.first == -1) {
                                             downloadDao.delete(downloadObject)
                                             errorNotification(downloadObject)
@@ -381,10 +391,10 @@ class DownloadManager : Service() {
 
         private fun errorNotification(downloadObject: DownloadObject) {
             val notification = NotificationCompat.Builder(context, CHANNEL)
-                    .setColor(ContextCompat.getColor(context, android.R.color.holo_red_dark))
-                    .setSmallIcon(android.R.drawable.stat_notify_error)
-                    .setContentTitle(downloadObject.name)
-                    .setContentText("Error al descargar " + downloadObject.chapter?.toLowerCase(Locale.ENGLISH))
+                .setColor(ContextCompat.getColor(context, android.R.color.holo_red_dark))
+                .setSmallIcon(android.R.drawable.stat_notify_error)
+                .setContentTitle(downloadObject.name)
+                .setContentText("Error al descargar " + downloadObject.chapter.lowercase(Locale.ENGLISH))
                     .setOngoing(false)
                     .setWhen(downloadObject.time)
                     .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -422,12 +432,22 @@ class DownloadManager : Service() {
         private fun getPending(downloadObject: DownloadObject, action: Int): PendingIntent {
             return try {
                 val intent = Intent(context, DownloadReceiver::class.java)
-                        .putExtra("did", downloadObject.getDid())
-                        .putExtra("eid", downloadObject.eid)
-                        .putExtra("action", action)
-                PendingIntent.getBroadcast(context, downloadObject.key + action, intent, PendingIntent.FLAG_CANCEL_CURRENT)
+                    .putExtra("did", downloadObject.getDid())
+                    .putExtra("eid", downloadObject.eid)
+                    .putExtra("action", action)
+                PendingIntent.getBroadcast(
+                    context,
+                    downloadObject.key + action,
+                    intent,
+                    PendingIntent.FLAG_CANCEL_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
             } catch (e: IllegalStateException) {
-                PendingIntent.getBroadcast(context, 0, Intent(), PendingIntent.FLAG_CANCEL_CURRENT)
+                PendingIntent.getBroadcast(
+                    context,
+                    0,
+                    Intent(),
+                    PendingIntent.FLAG_CANCEL_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
             }
         }
 
